@@ -1,0 +1,62 @@
+--- horde-webmail-1.2.8.orig/imp/login.php	2010-10-25 17:10:05.000000000 +0200
++++ horde-webmail-1.2.8/imp/login.php	2010-11-30 17:36:27.571023703 +0100
+@@ -398,6 +398,7 @@
+     $t->set('user_vinfo', Horde::callHook('_imp_hook_vinfo', array('vdomain'), 'imp'));
+ }
+ $t->set('password_tabindex', ++$tabindex);
++$t->set('captch_tabindex', ++$tabindex);
+ 
+ $t->set('change_smtphost', (!empty($conf['server']['change_smtphost'])));
+ if ($t->get('change_smtphost')) {
+@@ -446,7 +447,16 @@
+     'var imp_auth = ' . intval($imp_auth),
+     'var nomenu = ' . intval(empty($conf['menu']['always'])),
+ ));
+-echo $t->fetch(IMP_TEMPLATES . '/login/login.html');
++
++// ZMENA
++ini_set('include_path', ini_get('include_path').':/usr/share/php');
++
++require_once 'Text/CAPTCHA/Numeral.php';
++$numcap = new Text_CAPTCHA_Numeral;
++
++echo str_replace('Vysledek', $numcap->getOperation().' =', $t->fetch(IMP_TEMPLATES . '/login/login.html'));
++$_SESSION['answer'] = $numcap->getAnswer();
++//KONEC ZMENY
+ 
+ if (!empty($recompose_data)) {
+     /* Prepare recompose template. */
+
+--- horde-webmail-1.2.8.orig/imp/redirect.php	2010-10-25 17:10:05.000000000 +0200
++++ horde-webmail-1.2.8/imp/redirect.php	2010-11-30 17:36:27.555023948 +0100
+@@ -91,6 +91,14 @@
+ require_once 'Horde/Maintenance.php';
+ 
+ $actionID = (Util::getFormData('action') == 'compose') ? 'login_compose' : Util::getFormData('actionID');
++
++$captch = Util::getFormData('captch');
++if (isset($captch) && isset($_SESSION['answer'])) {
++    if ($captch != $_SESSION['answer']) {
++            _redirect(Auth::addLogoutParameters(IMP::logoutUrl(), AUTH_REASON_FAILED));
++    }
++}
++
+ $autologin = Util::getFormData('autologin');
+ $imapuser = Util::getPost('imapuser');
+ $pass = Util::getPost('pass');
+
+--- horde-webmail-1.2.8.orig/imp/templates/login/login.html	2010-10-25 17:10:05.000000000 +0200
++++ horde-webmail-1.2.8/imp/templates/login/login.html	2010-11-30 17:36:27.215029139 +0100
+@@ -94,6 +94,12 @@
+       <input type="password" tabindex="<tag:password_tabindex />" id="pass" name="pass" style="direction:ltr" />
+      </td>
+     </tr>
++    <tr>
++     <td class="light rightAlign"><label for="captch"><strong><gettext>Vysledek</gettext></strong></label></td>
++     <td class="leftAlign">
++      <input type="text" tabindex="<tag:captch_tabindex />" id="captch" name="captch" style="direction:ltr" />
++     </td>
++    </tr>
+ 
+ <if:change_smtphost>
+     <tr style="height: 1em;">
